@@ -1,6 +1,6 @@
 // HAVAKARE — servis worker: tekrar ziyaretlerde model/JS/CSS/görseller internetsiz anında açılır.
 // Videolar (Cloudinary, range istekleri) bilerek önbelleğe alınmaz.
-const VERSION = '20261101-1911';
+const VERSION = '20261101-1924';
 const CACHE = 'havakare-' + VERSION;
 
 self.addEventListener('install', () => self.skipWaiting());

@@ -78,15 +78,19 @@ const GL_PROFILES = {
     mid: { dpr: 1.25, heroDpr: 1.1, aa: true, budget: 1.6e6, fps: 60, power: 'high-performance' },
     low: { dpr: 1, heroDpr: 1, aa: false, budget: 1.1e6, fps: 60, power: 'default' },
   },
+  // Telefon ekranları 2x-3x yoğunlukta: dron 1.25x'te çizilirse büyütülünce pikselli görünür.
+  // Telefon tuvalleri artık yalnızca görünen alanı kaplıyor (bkz. droneStage.js fitAndResize),
+  // bu yüzden 2x yoğunluk kaldırılabiliyor. 3x ekranda 2x ile fark gözle seçilmez, maliyet
+  // %56 daha az.
   ios: {
-    high: { dpr: 1.5, heroDpr: 1.3, aa: true, budget: 1.6e6, fps: 60, power: 'default' },
-    mid: { dpr: 1.5, heroDpr: 1.25, aa: true, budget: 1.5e6, fps: 60, power: 'default' },
-    low: { dpr: 1.25, heroDpr: 1.1, aa: true, budget: 1.0e6, fps: 30, power: 'default' },
+    high: { dpr: 2, heroDpr: 2, aa: true, budget: 2.4e6, fps: 60, power: 'default' },
+    mid: { dpr: 2, heroDpr: 2, aa: true, budget: 2.2e6, fps: 60, power: 'default' },
+    low: { dpr: 1.5, heroDpr: 1.5, aa: true, budget: 1.3e6, fps: 30, power: 'default' },
   },
   android: {
-    high: { dpr: 1.5, heroDpr: 1.3, aa: true, budget: 1.6e6, fps: 60, power: 'high-performance' },
-    mid: { dpr: 1.25, heroDpr: 1.15, aa: true, budget: 1.2e6, fps: 60, power: 'default' },
-    low: { dpr: 1, heroDpr: 1, aa: false, budget: 0.8e6, fps: 30, power: 'default' },
+    high: { dpr: 2, heroDpr: 2, aa: true, budget: 2.4e6, fps: 60, power: 'high-performance' },
+    mid: { dpr: 2, heroDpr: 1.75, aa: true, budget: 1.9e6, fps: 60, power: 'default' },
+    low: { dpr: 1.5, heroDpr: 1.5, aa: true, budget: 1.2e6, fps: 30, power: 'default' },
   },
 };
 

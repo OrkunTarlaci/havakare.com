@@ -800,8 +800,24 @@ function createStageScene(container, orientationGroup, { dark = false, stageKey 
     // canvas gets the same kind of bleed the hero has — never cut by an edge.
     const isManifestoDesktop = stageKey === 'manifesto' && !isMobileViewport();
     const hasBleed = isHero || isManifestoDesktop;
-    const bleedX = isHero ? Math.round(width * HERO_BLEED_X) : isManifestoDesktop ? Math.round(width * 0.4) : 0;
-    const bleedTop = isHero ? Math.round(height * HERO_BLEED_TOP) : isManifestoDesktop ? Math.round(height * 0.2) : 0;
+    // TELEFON NETLİĞİ: telefonda hero konteyneri zaten ekranın tam genişliğinde ve sayfanın en
+    // üstünde. Yanlara/üste taşan tuval alanı ekran DIŞINDA kalır (gövde yatay taşmayı keser) —
+    // tamamen boşa çizilir. Eskiden bu boş alan piksel bütçesini yiyor, dron 2x ekranda ~1.1x
+    // yoğunlukla (pikselli) çiziliyordu. Telefonda yan/üst taşma kapalı; görünen alan aynı,
+    // bütçe artık yalnızca görünen kısma harcanıyor. Masaüstü değişmedi.
+    // Telefonda taşma, tam olarak ekran kenarlarına / sayfanın en üstüne kadar (kenar boşluğu
+    // ~20 px) — dron ekran kenarına yaklaşınca tuval kenarında kesik görünmez, ekran dışına
+    // tek piksel bile çizilmez.
+    const mobileHero = isHero && isMobileViewport();
+    let mobileGapX = 0;
+    let mobileGapTop = 0;
+    if (mobileHero) {
+      const cr = container.getBoundingClientRect();
+      mobileGapX = Math.max(0, Math.round(Math.max(cr.left, window.innerWidth - cr.right)));
+      mobileGapTop = Math.max(0, Math.round(cr.top + window.scrollY));
+    }
+    const bleedX = mobileHero ? mobileGapX : isHero ? Math.round(width * HERO_BLEED_X) : isManifestoDesktop ? Math.round(width * 0.4) : 0;
+    const bleedTop = mobileHero ? mobileGapTop : isHero ? Math.round(height * HERO_BLEED_TOP) : isManifestoDesktop ? Math.round(height * 0.2) : 0;
     const bleedBottom = hasBleed && !heroMobileExt ? Math.round(height * (isHero ? HERO_BLEED_BOTTOM : 0.2)) : 0;
 
     if (heroMobileExt || hasBleed) {

@@ -11,7 +11,7 @@
 
 import { buildWhatsAppUrl } from './utils.js';
 import { initWhatsAppPicker } from './whatsappPicker.js';
-import { netTier, GL, VIDEO } from './device.js';
+import { netTier, GL, VIDEO, OS } from './device.js';
 
 const PHONE_DISPLAY = '0534 376 88 29';
 const PHONE_TEL = 'tel:+905343768829';
@@ -203,7 +203,9 @@ async function initApp() {
   let sampleFrames = 0;
   let level = 0;
   let graceUntil = 0;
-  const LEVELS = [1, 0.85, 0.7, 0.55];
+  // Telefonda dron pikselli görünmesin: çözünürlük en fazla %80'e iner (ekran zaten küçük,
+  // bundan fazlası netliği gözle görülür bozar). Masaüstünde eskisi gibi %55'e kadar.
+  const LEVELS = OS === 'desktop' ? [1, 0.85, 0.7, 0.55] : [1, 0.9, 0.8];
   document.addEventListener('visibilitychange', () => {
     sampleStart = 0;
     graceUntil = performance.now() + 3000;

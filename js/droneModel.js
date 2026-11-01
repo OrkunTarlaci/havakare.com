@@ -29,13 +29,13 @@ import { splitPropellers, createPropAnimator, createClipPropAnimator, holdPropsA
 // MAIN drone. Relative path so it keeps resolving correctly under a GitHub
 // Pages project subpath (e.g. https://user.github.io/repo/) — never made
 // absolute/root-based.
-export const MODEL_URL_MINI3 = './models/dji_mini_3_pro.glb?v=20261101-1911';
+export const MODEL_URL_MINI3 = './models/dji_mini_3_pro.glb?v=20261101-1924';
 
 // Cinematic (dark, "KADRAJ BİZİM İÇİN HER ŞEY" / "Görmek değil. Doğru
 // yerden göstermek.") stage model. Also used by the manifesto ("Doğru
 // görüntüyü yakalamak başka bir iş.") stage. Same relative-path rule
 // applies.
-export const MODEL_URL_MAVIC3 = './models/dji_mavic_3.glb?v=20261101-1911';
+export const MODEL_URL_MAVIC3 = './models/dji_mavic_3.glb?v=20261101-1924';
 
 // Target size (world units) for the model's largest bounding-box dimension
 // after normalization. Shared by every model so all stages read at a
