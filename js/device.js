@@ -73,10 +73,13 @@ export const HW = detectHwTier();
 //   fps       — 3D çizim tavanı (hareket zaman tabanlı: 30'da da aynı hızda ilerler)
 //   power     — hibrit dizüstülerde güçlü ekran kartını iste
 const GL_PROFILES = {
+  // Masaüstü: Windows dizüstülerinin çoğu %125-150 ölçekte (1.25x-1.5x), Mac'ler 2x.
+  // Eski tavan (hero 1.25x) bu ekranlarda dronu yumuşak gösteriyordu. Tuvaller artık ekran
+  // dışına taşmadığı için (bkz. droneStage.js fitAndResize) 2x'e kadar çıkılabiliyor.
   desktop: {
-    high: { dpr: 1.5, heroDpr: 1.25, aa: true, budget: 2.4e6, fps: 60, power: 'high-performance' },
-    mid: { dpr: 1.25, heroDpr: 1.1, aa: true, budget: 1.6e6, fps: 60, power: 'high-performance' },
-    low: { dpr: 1, heroDpr: 1, aa: false, budget: 1.1e6, fps: 60, power: 'default' },
+    high: { dpr: 2, heroDpr: 2, aa: true, budget: 3.6e6, fps: 60, power: 'high-performance' },
+    mid: { dpr: 1.5, heroDpr: 1.5, aa: true, budget: 2.4e6, fps: 60, power: 'high-performance' },
+    low: { dpr: 1.25, heroDpr: 1.25, aa: false, budget: 1.4e6, fps: 60, power: 'default' },
   },
   // Telefon ekranları 2x-3x yoğunlukta: dron 1.25x'te çizilirse büyütülünce pikselli görünür.
   // Telefon tuvalleri artık yalnızca görünen alanı kaplıyor (bkz. droneStage.js fitAndResize),

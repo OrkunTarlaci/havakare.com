@@ -203,9 +203,9 @@ async function initApp() {
   let sampleFrames = 0;
   let level = 0;
   let graceUntil = 0;
-  // Telefonda dron pikselli görünmesin: çözünürlük en fazla %80'e iner (ekran zaten küçük,
-  // bundan fazlası netliği gözle görülür bozar). Masaüstünde eskisi gibi %55'e kadar.
-  const LEVELS = OS === 'desktop' ? [1, 0.85, 0.7, 0.55] : [1, 0.9, 0.8];
+  // Dron pikselli/bulanık görünmesin: çözünürlük telefonda en fazla %80'e, masaüstünde %70'e
+  // iner (eskiden masaüstünde %55'e kadar iniyor, dron belirgin şekilde bulanıklaşıyordu).
+  const LEVELS = OS === 'desktop' ? [1, 0.9, 0.8, 0.7] : [1, 0.9, 0.8];
   document.addEventListener('visibilitychange', () => {
     sampleStart = 0;
     graceUntil = performance.now() + 3000;

@@ -712,6 +712,20 @@ function createStageScene(container, orientationGroup, { dark = false, stageKey 
   renderer.domElement.classList.add('drone-stage-canvas');
   container.appendChild(renderer.domElement);
 
+  // DOKU NETLİĞİ: gövde/pervane dokuları dron dönerken eğik açıdan görünür; varsayılan
+  // filtre o açılarda dokuyu bulanıklaştırır. Anizotropik filtre (8x) eğik yüzeylerde de
+  // keskin tutar. Model dosyasına dokunulmaz; yalnızca GPU'nun dokuyu okuma biçimi değişir.
+  const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1);
+  if (maxAniso > 1) {
+    const TEX_KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'];
+    orientationGroup.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+        TEX_KEYS.forEach((k) => { if (m[k] && m[k].anisotropy < maxAniso) m[k].anisotropy = maxAniso; });
+      });
+    });
+  }
+
   // Camera distance multiplier — always 1 (normal, tight framing) except
   // during the hero stage's intro flight, which temporarily raises it
   // (pulling the camera back so the wider flight path stays inside the
@@ -800,24 +814,25 @@ function createStageScene(container, orientationGroup, { dark = false, stageKey 
     // canvas gets the same kind of bleed the hero has — never cut by an edge.
     const isManifestoDesktop = stageKey === 'manifesto' && !isMobileViewport();
     const hasBleed = isHero || isManifestoDesktop;
-    // TELEFON NETLİĞİ: telefonda hero konteyneri zaten ekranın tam genişliğinde ve sayfanın en
-    // üstünde. Yanlara/üste taşan tuval alanı ekran DIŞINDA kalır (gövde yatay taşmayı keser) —
-    // tamamen boşa çizilir. Eskiden bu boş alan piksel bütçesini yiyor, dron 2x ekranda ~1.1x
-    // yoğunlukla (pikselli) çiziliyordu. Telefonda yan/üst taşma kapalı; görünen alan aynı,
-    // bütçe artık yalnızca görünen kısma harcanıyor. Masaüstü değişmedi.
-    // Telefonda taşma, tam olarak ekran kenarlarına / sayfanın en üstüne kadar (kenar boşluğu
-    // ~20 px) — dron ekran kenarına yaklaşınca tuval kenarında kesik görünmez, ekran dışına
-    // tek piksel bile çizilmez.
+    // NETLİK (telefon + masaüstü): taşma payı hiçbir zaman ekranın kenarlarını / sayfanın en
+    // üstünü geçmez. Gövde yatay taşmayı kestiği ve hero sayfanın en üstünde olduğu için o
+    // bölgeye çizilen her piksel GÖRÜNMEZDİ ama piksel bütçesini yiyordu → dron düşük
+    // yoğunlukla (telefonda ~1.1x, masaüstünde %20+ boşa) çiziliyordu. Görünen alan birebir
+    // aynı; bütçe artık yalnızca görünen kısma harcanıyor. Sol ve sağ ayrı hesaplanır
+    // (masaüstünde hero sağ sütunda: solda yazı tarafına uzanır, sağda ekran kenarında biter).
     const mobileHero = isHero && isMobileViewport();
-    let mobileGapX = 0;
-    let mobileGapTop = 0;
-    if (mobileHero) {
+    let bleedL = 0;
+    let bleedR = 0;
+    let bleedTop = 0;
+    if (hasBleed) {
+      const wantX = mobileHero ? Infinity : isHero ? Math.round(width * HERO_BLEED_X) : Math.round(width * 0.4);
+      const wantTop = mobileHero ? Infinity : isHero ? Math.round(height * HERO_BLEED_TOP) : Math.round(height * 0.2);
       const cr = container.getBoundingClientRect();
-      mobileGapX = Math.max(0, Math.round(Math.max(cr.left, window.innerWidth - cr.right)));
-      mobileGapTop = Math.max(0, Math.round(cr.top + window.scrollY));
+      const viewW = document.documentElement.clientWidth || window.innerWidth;
+      bleedL = Math.max(0, Math.min(wantX, Math.round(cr.left)));
+      bleedR = Math.max(0, Math.min(wantX, Math.round(viewW - cr.right)));
+      bleedTop = Math.max(0, Math.min(wantTop, Math.round(cr.top + window.scrollY)));
     }
-    const bleedX = mobileHero ? mobileGapX : isHero ? Math.round(width * HERO_BLEED_X) : isManifestoDesktop ? Math.round(width * 0.4) : 0;
-    const bleedTop = mobileHero ? mobileGapTop : isHero ? Math.round(height * HERO_BLEED_TOP) : isManifestoDesktop ? Math.round(height * 0.2) : 0;
     const bleedBottom = hasBleed && !heroMobileExt ? Math.round(height * (isHero ? HERO_BLEED_BOTTOM : 0.2)) : 0;
 
     if (heroMobileExt || hasBleed) {
@@ -829,15 +844,15 @@ function createStageScene(container, orientationGroup, { dark = false, stageKey 
       const nearScale = camera.near / distance;
       const topN = (worldHalfHeight + bleedTop / pxPerWorld) * nearScale;
       const bottomN = -(worldHalfHeight + (extraBottomPx + bleedBottom) / pxPerWorld) * nearScale;
-      const leftN = -(worldHalfWidth + bleedX / pxPerWorld) * nearScale;
-      const rightN = (worldHalfWidth + bleedX / pxPerWorld) * nearScale;
+      const leftN = -(worldHalfWidth + bleedL / pxPerWorld) * nearScale;
+      const rightN = (worldHalfWidth + bleedR / pxPerWorld) * nearScale;
       camera.projectionMatrix.makePerspective(leftN, rightN, topN, bottomN, camera.near, camera.far);
       camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 
-      const canvasW = width + bleedX * 2;
+      const canvasW = width + bleedL + bleedR;
       const canvasH = height + bleedTop + extraBottomPx + bleedBottom;
       const el = renderer.domElement;
-      el.style.left = `${-bleedX}px`;
+      el.style.left = `${-bleedL}px`;
       el.style.top = `${-bleedTop}px`;
       el.style.width = `${canvasW}px`;
       el.style.height = `${canvasH}px`;
