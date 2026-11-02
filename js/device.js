@@ -31,10 +31,24 @@ export const OS = /iPhone|iPad|iPod/.test(ua) || isIPadOS ? 'ios' : /Android/i.t
 // o senaryo taklit edilir. Normal ziyaretçiyi etkilemez.
 const NET_OVERRIDE = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('net') : null;
 
+// GERÇEK HIZ ÖLÇÜMÜ: 3D model indirilirken ölçülen hız (Mbit/sn). Tarayıcının tahmini
+// yanıltıcı olabilir (iPhone/Safari hiç bilgi vermez; Android zayıf 4G'yi "4g" sayar).
+// Ölçüm varsa ve yavaşsa ağ 'low' sayılır — video küçük dosyayla başlar, bant genişliği
+// drona kalır. Önbellekten gelen (çok kısa süren) indirmeler ölçüme sayılmaz.
+let measuredMbps = 0;
+
+export function reportThroughput(bytes, ms) {
+  if (!bytes || ms < 250 || bytes < 100e3) return; // önbellekten geldi / ölçülemeyecek kadar küçük
+  const mbps = (bytes * 8) / (ms / 1000) / 1e6;
+  measuredMbps = measuredMbps ? Math.min(measuredMbps, mbps) : mbps;
+  if (typeof window !== 'undefined' && window.__havakareDevice) window.__havakareDevice.measuredMbps = +measuredMbps.toFixed(2);
+}
+
 export function netTier() {
   if (NET_OVERRIDE === 'low' || NET_OVERRIDE === 'off' || NET_OVERRIDE === 'high') return NET_OVERRIDE;
   const c = nav.connection || {};
   if (c.saveData === true || /(^|-)2g$/.test(c.effectiveType || '')) return 'off';
+  if (measuredMbps) return measuredMbps < 3 ? 'low' : 'high';
   if (c.effectiveType === '3g' || (c.downlink && c.downlink < 1.5)) return 'low';
   return 'high';
 }
@@ -103,10 +117,18 @@ export const GL = GL_PROFILES[OS][HW];
 //   maxDpr   — video, ekranda kapladığı alan × bu yoğunluk kadar keskin seçilir
 //   maxWidth — en büyük dosya (telefon ekranı için 1920 gereksiz büyük)
 // Kalite her zaman q_auto:good: eski "eco" kalite görüntüyü bulanık/sisli yapıyordu.
-export const VIDEO = {
-  maxDpr: OS === 'desktop' ? 1.5 : 2,
-  maxWidth: OS === 'desktop' ? 1920 : HW === 'low' ? 1280 : 1600,
-};
+// Telefonda video çözme (decode) ile 3D çizim aynı anda yapıldığı için zayıf/orta telefonda
+// video boyutu sınırlı tutulur (1600 px video zayıf Android'de kasmanın ana sebebiydi).
+//   secondaryMax — ikinci (manifesto) videosu: telefonda yazı perdesinin altında kalır,
+//                  bir kademe küçük olması gözle seçilmez ama çok daha hafiftir.
+export const VIDEO =
+  OS === 'desktop'
+    ? { maxDpr: 1.5, maxWidth: HW === 'low' ? 1280 : 1920, secondaryMax: HW === 'low' ? 1280 : 1920 }
+    : HW === 'high'
+    ? { maxDpr: 2, maxWidth: 1600, secondaryMax: 1280 }
+    : HW === 'mid'
+    ? { maxDpr: 1.75, maxWidth: 1280, secondaryMax: 960 }
+    : { maxDpr: 1.5, maxWidth: 960, secondaryMax: 960 };
 
 // Geliştirme kolaylığı: konsolda window.__havakareDevice ile görülebilir.
 if (typeof window !== 'undefined') {

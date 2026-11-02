@@ -10,13 +10,13 @@
   "imports": {
     "three": "./vendor/three/three.module.min.js",
     "three/addons/": "./vendor/three/addons/",
-    "./js/droneStage.js": "./js/droneStage.js?v=20261101-1934",
-    "./js/droneModel.js": "./js/droneModel.js?v=20261101-1934",
-    "./js/droneProps.js": "./js/droneProps.js?v=20261101-1934",
-    "./js/scene.js": "./js/scene.js?v=20261101-1934",
-    "./js/utils.js": "./js/utils.js?v=20261101-1934",
-    "./js/whatsappPicker.js": "./js/whatsappPicker.js?v=20261101-1934",
-    "./js/device.js": "./js/device.js?v=20261101-1934"
+    "./js/droneStage.js": "./js/droneStage.js?v=20261102-1734",
+    "./js/droneModel.js": "./js/droneModel.js?v=20261102-1734",
+    "./js/droneProps.js": "./js/droneProps.js?v=20261102-1734",
+    "./js/scene.js": "./js/scene.js?v=20261102-1734",
+    "./js/utils.js": "./js/utils.js?v=20261102-1734",
+    "./js/whatsappPicker.js": "./js/whatsappPicker.js?v=20261102-1734",
+    "./js/device.js": "./js/device.js?v=20261102-1734"
   }
 }
 </script>
@@ -50,38 +50,36 @@
 <!-- Fontlar sayfayı bloklamadan yüklenir -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
-<link rel="stylesheet" href="./css/styles.css?v=20261101-1934" />
+<link rel="stylesheet" href="./css/styles.css?v=20261102-1734" />
 
 <!-- ÖNCELİK: önce hero video posteri, sonra video. 3D drone (three.js + GLB ≈ 1.3 MB) artık burada
      ÖNCEDEN indirilmez; main.js video akmaya başlayınca (yavaş hatta tamponlanınca) yükler. -->
 <link rel="preload" as="image" href="https://res.cloudinary.com/tyrtartu/video/upload/so_1,f_auto,q_auto:good,w_1600,c_limit/v1793225596/1029_2.jpg" fetchpriority="high" />
 
 <script>
-/* Hızlı hatta drone dosyaları eskisi gibi hemen iner (giriş animasyonu akıcı başlar).
-   3G / 2G / veri tasarrufunda eklenmez: o zaman bant genişliği videoya kalır. */
+/* Hero 3D dron dosyaları HER hatta sayfa açılır açılmaz inmeye başlar (dron, arka plan
+   videosundan ÖNCE gelir; video onu bekler — bkz. main.js). Eskiden yavaş hatta bu adım
+   atlanıyor, dron videonun arkasında kalıp çok geç geliyor ya da hiç gelmiyordu. */
 (function () {
-  var c = navigator.connection || {};
-  var slow = c.saveData === true || /(^|-)(2g|3g)$/.test(c.effectiveType || '') || (c.downlink && c.downlink < 1.5);
-  if (slow) return;
   // Sürüm, bump-version.sh tarafından diğer ?v= değerleriyle birlikte güncellenir (aynı olmalı:
   // farklı olursa önden indirilen dosyalar kullanılmaz ve ikinci kez indirilir).
-  var V = '20261101-1934', h = document.head;
+  var V = '20261102-1734', h = document.head;
   function add(rel, href, extra) {
     var l = document.createElement('link'); l.rel = rel; l.href = href;
     for (var k in (extra || {})) l.setAttribute(k, extra[k]);
     h.appendChild(l);
   }
-  add('preload', './models/dji_mini_3_pro.glb?v=' + V, { as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'low' });
+  add('preload', './models/dji_mini_3_pro.glb?v=' + V, { as: 'fetch', crossorigin: 'anonymous', fetchpriority: 'high' });
   ['./vendor/three/three.module.min.js', './js/droneStage.js?v=' + V, './js/droneModel.js?v=' + V,
    './js/droneProps.js?v=' + V, './js/scene.js?v=' + V, './js/device.js?v=' + V,
    './vendor/three/addons/loaders/GLTFLoader.js', './vendor/three/addons/utils/BufferGeometryUtils.js',
    './vendor/three/addons/utils/SkeletonUtils.js', './vendor/three/addons/libs/meshopt_decoder.module.js']
-    .forEach(function (u) { add('modulepreload', u, { fetchpriority: 'low' }); });
+    .forEach(function (u) { add('modulepreload', u); });
 })();
 </script>
 <!-- Three.js as native ES modules via import map (no build step needed) -->
 <!-- GSAP (UMD, global gsap) — drives the slow yaw spin + hero text intro -->
-<script src="./vendor/gsap.min.js?v=20261101-1934" defer></script>
+<script src="./vendor/gsap.min.js?v=20261102-1734" defer></script>
 <!-- Güvenlik ağı: herhangi bir script/CDN sorunu olsa bile açılış ekranı en geç 5 sn sonra kalkar,
      site asla "GÖRÜNTÜ HAZIRLANIYOR" ekranında takılı kalmaz. -->
 <script>
@@ -600,8 +598,8 @@
   <span class="whatsapp-tooltip">WhatsApp'tan Yazın</span>
 </a>
 
-<script type="module" src="./js/smoothScroll.js?v=20261101-1934"></script>
-<script type="module" src="./js/main.js?v=20261101-1934"></script>
-<script type="module" src="./js/faq.js?v=20261101-1934"></script>
+<script type="module" src="./js/smoothScroll.js?v=20261102-1734"></script>
+<script type="module" src="./js/main.js?v=20261102-1734"></script>
+<script type="module" src="./js/faq.js?v=20261102-1734"></script>
 </body>
 </html>

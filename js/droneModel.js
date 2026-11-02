@@ -24,18 +24,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { splitPropellers, createPropAnimator, createClipPropAnimator, holdPropsAtRest } from './droneProps.js';
+import { reportThroughput } from './device.js';
 
 // Hero stage model ("Gökyüzünden bakınca hikâye değişir.") — the site's
 // MAIN drone. Relative path so it keeps resolving correctly under a GitHub
 // Pages project subpath (e.g. https://user.github.io/repo/) — never made
 // absolute/root-based.
-export const MODEL_URL_MINI3 = './models/dji_mini_3_pro.glb?v=20261101-1934';
+export const MODEL_URL_MINI3 = './models/dji_mini_3_pro.glb?v=20261102-1734';
 
 // Cinematic (dark, "KADRAJ BİZİM İÇİN HER ŞEY" / "Görmek değil. Doğru
 // yerden göstermek.") stage model. Also used by the manifesto ("Doğru
 // görüntüyü yakalamak başka bir iş.") stage. Same relative-path rule
 // applies.
-export const MODEL_URL_MAVIC3 = './models/dji_mavic_3.glb?v=20261101-1934';
+export const MODEL_URL_MAVIC3 = './models/dji_mavic_3.glb?v=20261102-1734';
 
 // Target size (world units) for the model's largest bounding-box dimension
 // after normalization. Shared by every model so all stages read at a
@@ -89,15 +90,79 @@ const templatePromises = new Map();
 // sahne ile aynı anahtarla saklanır (userData klonlamada bozulacağı için ayrı Map).
 const clipsByTemplate = new WeakMap();
 
-function loadTemplateScene(modelUrl) {
+// ---- SAĞLAM İNDİRME ----------------------------------------------------------
+// GLB, GLTFLoader.load yerine kendi fetch'imizle indirilir:
+//   * TAKILMA BEKÇİSİ: STALL_MS boyunca tek bayt gelmezse istek iptal edilir; böylece
+//     yavaş/kopan hatta askıda kalan istek sonsuza dek beklemez, droneStage.js'deki
+//     yeniden deneme mekanizması devreye girer (eskiden takılan istek hiç bitmiyordu).
+//   * ÖNCELİK: hero modeli 'high' öncelikle istenir (video ve görsellerden önce iner).
+//   * HIZ ÖLÇÜMÜ: indirme hızı device.js'e bildirilir. iPhone (Safari) bağlantı hızını
+//     söylemediği için video kalitesi artık bu gerçek ölçüme göre seçilir.
+const STALL_MS = 15000;
+
+async function fetchModelBuffer(url, priority) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timer = null;
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => ctrl && ctrl.abort(), STALL_MS);
+  };
+  arm();
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, { signal: ctrl ? ctrl.signal : undefined, priority, credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + url);
+    let buffer;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const chunks = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.length;
+        arm();
+      }
+      const out = new Uint8Array(size);
+      let off = 0;
+      for (const c of chunks) { out.set(c, off); off += c.length; }
+      buffer = out.buffer;
+    } else {
+      buffer = await res.arrayBuffer();
+    }
+    // Dosya index.html'de önden yükleniyorsa indirme bu fetch'ten önce başlamıştır: hız,
+    // tarayıcının kendi kaynak zamanlamasından okunur (transferSize 0 = önbellekten geldi).
+    let ms = performance.now() - t0;
+    let bytes = buffer.byteLength;
+    try {
+      const abs = new URL(url, location.href).href;
+      const e = performance.getEntriesByName(abs).filter((x) => x.responseEnd > 0).pop();
+      if (e) { ms = e.responseEnd - e.startTime; bytes = e.transferSize || 0; }
+    } catch (_) { /* ölçüm opsiyonel */ }
+    reportThroughput(bytes, ms);
+    return buffer;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function loadTemplateScene(modelUrl, priority = 'auto') {
   if (!templatePromises.has(modelUrl)) {
     templatePromises.set(
       modelUrl,
       new Promise((resolve, reject) => {
         const loader = new GLTFLoader();
         loader.setMeshoptDecoder(MeshoptDecoder); // modeller meshopt ile sıkıştırıldı (≈0.5 MB)
-        loader.load(
-          modelUrl,
+        const fail = (err) => {
+          // Yavaş/kopan hatta bir sonraki denemede yeniden indirilebilsin (önbellekte
+          // reddedilmiş söz kalırsa dron o sayfa açıkken bir daha hiç gelmezdi).
+          templatePromises.delete(modelUrl);
+          reject(err);
+        };
+        fetchModelBuffer(modelUrl, priority).then((buffer) => loader.parse(
+          buffer,
+          modelUrl.replace(/[^/]*$/, ''),
           (gltf) => {
             // Mini 3 Pro: pervaneleri (4 adet) birleşik mesh'lerden ayırıp
             // döndürülebilir pivotlara böler (bkz. droneProps.js). Hata olursa
@@ -108,19 +173,14 @@ function loadTemplateScene(modelUrl) {
             clipsByTemplate.set(gltf.scene, gltf.animations || []);
             resolve(gltf.scene);
           },
-          undefined,
-          (err) => {
-            // Yavaş/kopan hatta bir sonraki denemede yeniden indirilebilsin (önbellekte
-            // reddedilmiş söz kalırsa dron o sayfa açıkken bir daha hiç gelmezdi).
-            templatePromises.delete(modelUrl);
-            reject(err);
-          }
-        );
+          fail
+        )).catch(fail);
       })
     );
   }
   return templatePromises.get(modelUrl);
 }
+
 
 // ---- HIZLI YÜKLEME ---------------------------------------------------------
 // İlk açılışta tek ağır dosya hero drone'udur. Mavic 3 modeli, hero hazır olduktan
@@ -147,7 +207,8 @@ export function preloadModel(modelUrl) {
  * has its own unrelated auto-detected forward vector.
  */
 export async function loadDroneRig(modelUrl = MODEL_URL_MINI3, manualOrientationOffsetY = MANUAL_ORIENTATION_OFFSET_Y) {
-  const template = await loadTemplateScene(modelUrl);
+  // Hero modeli (Mini 3 Pro) en yüksek öncelikle iner; diğerleri normal öncelikle.
+  const template = await loadTemplateScene(modelUrl, modelUrl === MODEL_URL_MINI3 ? 'high' : 'auto');
   const rawModel = cloneSkeleton(template);
   return buildRig(rawModel, manualOrientationOffsetY, clipsByTemplate.get(template) || []);
 }

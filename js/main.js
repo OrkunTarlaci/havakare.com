@@ -168,10 +168,7 @@ async function initApp() {
     new Promise((r) => setTimeout(r, 700)),
   ]);
 
-  // ÖNCELİK SIRASI (kasmanın asıl çözümü): 1) sayfa  2) hero videosu  3) 3D drone.
-  // Eskiden three.js + 2 GLB (~2,3 MB) video ile aynı anda iniyor ve GPU'da shader derleme /
-  // MSAA canvas, video çözmeyle yarışıyordu; özellikle Ctrl+Shift+T ile geri açılan sekmede
-  // video geç geliyor, takılıyordu. Artık drone, video akmaya başladıktan sonra yüklenir.
+  // ÖNCELİK SIRASI: 1) sayfa  2) hero 3D dronu (~0,5 MB)  3) hero videosu  4) diğer dronlar.
   async function bootDrone() {
     try {
       const { initDroneStages } = await import('./droneStage.js');
@@ -188,46 +185,55 @@ async function initApp() {
   document.body.classList.add('is-ready');
   playHeroTextIntro();
 
-  // PERFORMANS: (1) 120/144 Hz ekranlarda bile en fazla ~60 kare/sn çizilir; çok zayıf
-  // telefonlarda (device.js → GL.fps) 30 kare/sn — dron hareketleri zaman tabanlı olduğu için
-  // aynı hızda ve aynı yolda ilerler, yalnızca daha az kare çizilir (ısınma/kasma olmaz),
-  // (2) ortalama kare süresi hedefin belirgin üstünde kalırsa çözünürlük kademeli düşürülür
-  // (1 → 0.85 → 0.7 → 0.55), (3) TEK döngü: çizim GSAP ticker'ına bağlı.
-  // Sekme yeniden görünür olunca (Ctrl+Shift+T, sekme değişimi) ilk ~3 sn kalite kararına
-  // sayılmaz: tarayıcı o sırada zaten toparlanıyor, kaliteyi gereksiz düşürmesin.
-  const TARGET_FPS = GL.fps;
-  const MIN_FRAME_MS = 1000 / (TARGET_FPS + 2);
-  const SLOW_FRAME_MS = (1000 / TARGET_FPS) * 1.3; // 60 fps → ~21.7 ms, 30 fps → ~43 ms
+  // PERFORMANS — UYARLAMALI KALİTE MERDİVENİ:
+  // (1) 120/144 Hz ekranlarda bile en fazla ~60 kare/sn çizilir; çok zayıf telefonlarda
+  //     (device.js → GL.fps) baştan 30 kare/sn.
+  // (2) Cihaz yetişemezse (ortalama kare süresi hedefin belirgin üstünde) merdivende bir basamak
+  //     iner. ÖNCE kare hızı düşer (60 → 30), çözünürlük en son ve az düşer: dron hareketleri
+  //     zaman tabanlı olduğu için 30 kare/sn'de de aynı hızda, aynı yolda ilerler ve HD kalır;
+  //     eskiden yalnızca çözünürlük düşüyor, dron bulanıklaşırken kasma sürüyordu.
+  // (3) TEK döngü: çizim GSAP ticker'ına bağlı.
+  // Sekme yeniden görünür olunca (Ctrl+Shift+T, sekme değişimi) ilk ~3 sn karara sayılmaz.
+  const LADDER = (GL.fps <= 30
+    ? [{ q: 1, fps: 30 }, { q: 0.9, fps: 30 }, { q: 0.8, fps: 30 }]
+    : OS === 'desktop'
+    ? [{ q: 1, fps: 60 }, { q: 0.9, fps: 60 }, { q: 0.9, fps: 30 }, { q: 0.8, fps: 30 }, { q: 0.7, fps: 30 }]
+    : [{ q: 1, fps: 60 }, { q: 1, fps: 30 }, { q: 0.9, fps: 30 }, { q: 0.8, fps: 30 }]);
+  let level = 0;
+  let targetFps = LADDER[0].fps;
   let lastDraw = 0;
   let sampleStart = 0;
   let sampleFrames = 0;
-  let level = 0;
   let graceUntil = 0;
-  // Dron pikselli/bulanık görünmesin: çözünürlük telefonda en fazla %80'e, masaüstünde %70'e
-  // iner (eskiden masaüstünde %55'e kadar iniyor, dron belirgin şekilde bulanıklaşıyordu).
-  const LEVELS = OS === 'desktop' ? [1, 0.9, 0.8, 0.7] : [1, 0.9, 0.8];
   document.addEventListener('visibilitychange', () => {
     sampleStart = 0;
     graceUntil = performance.now() + 3000;
   });
 
+  function stepDown() {
+    if (level >= LADDER.length - 1) return;
+    level++;
+    targetFps = LADDER[level].fps;
+    if (droneSystem.setQuality) droneSystem.setQuality(LADDER[level].q);
+    sampleStart = 0;
+    graceUntil = performance.now() + 1500; // yeni basamağın oturmasını bekle
+  }
+
   function tick() {
     const now = performance.now();
     if (!droneSystem || document.hidden) { sampleStart = 0; return; }
-    if (now - lastDraw < MIN_FRAME_MS - 1) return;
+    if (now - lastDraw < 1000 / (targetFps + 2) - 1) return;
     lastDraw = now;
     droneSystem.render();
 
-    if (!firstRenderAt) { firstRenderAt = now; graceUntil = Math.max(graceUntil, now + 4000); }
+    if (!firstRenderAt) { firstRenderAt = now; graceUntil = Math.max(graceUntil, now + 2500); }
     if (!sampleStart) { sampleStart = now; sampleFrames = 0; return; }
     sampleFrames++;
-    if (sampleFrames >= TARGET_FPS) {
+    // ~1 sn'lik örnek: çok yavaş cihazda karar beklemeden verilsin
+    if (sampleFrames >= targetFps || now - sampleStart > 1500) {
       const avg = (now - sampleStart) / sampleFrames;
       sampleStart = now; sampleFrames = 0;
-      if (now > graceUntil && avg > SLOW_FRAME_MS && level < LEVELS.length - 1) {
-        level++;
-        if (droneSystem.setQuality) droneSystem.setQuality(LEVELS[level]);
-      }
+      if (now > graceUntil && avg > (1000 / targetFps) * 1.3) stepDown();
     }
   }
 
@@ -239,27 +245,14 @@ async function initApp() {
   }
 }
 
-// 3D drone'u ne zaman yükleyeceğiz? Dron HER hatta gelir (eskiden 2G / veri tasarrufunda
-// hiç yüklenmiyor, 3G'de 15 sn bekliyordu → "modeller gelmiyor").
-//   'off' / 'low' (yavaş hat) → sayfa yüklenir yüklenmez, VİDEODAN ÖNCE (video onu bekler)
-//   'high'                    → hero videosu akmaya başlayınca (en geç 3 sn)
+// 3D drone HER hatta ve HER ZAMAN İLK yüklenir; arka plan videosu onu bekler (bkz. initBgVideo).
+// Eskiden hızlı sanılan hatta (iPhone hiç hız bildirmez → hep "hızlı" sayılırdı) video önce
+// başlıyor, birkaç MB'lık video ile ~0,5 MB'lık dron bant genişliği için yarışıyor, dron çok
+// geç geliyor ya da hiç gelmiyordu. Dron ayrıştırma + shader derleme artık asenkron, video
+// çözmeyle çakışıp kasma yapmaz.
 function scheduleDroneBoot(boot) {
-  const tier = pickVideoTier(false);
-  let done = false;
-  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 60));
-  const go = () => { if (done) return; done = true; idle(boot, { timeout: 1000 }); };
-  if (tier !== 'high') {
-    if (document.readyState === 'complete') setTimeout(go, 100);
-    else window.addEventListener('load', () => setTimeout(go, 100), { once: true });
-    setTimeout(go, 2500);
-    return;
-  }
-  // Hero videosu oynamaya başlayınca (poster → video geçişi tamamlanınca) drone yüklenir.
-  window.addEventListener('havakare:video-playing', (e) => {
-    if (e.detail && String(e.detail).includes('hero-bg-video')) setTimeout(go, 400);
-  });
-  // Güvenlik ağı: video bir sebeple başlamazsa drone yine de gelsin.
-  setTimeout(go, 3000);
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
+  idle(boot, { timeout: 300 });
 }
 
 function hideLoadingScreen(loadingScreen) {
@@ -335,7 +328,7 @@ function lowRendition(url) {
 // telefona 640 px video iniyor, büyütülünce bulanık görünüyordu.
 // Basamaklar CDN önbelleğini verimli tutar. Kaynak daha küçükse c_limit zaten büyütmez.
 const VIDEO_ASPECT = 16 / 9;
-function fitWidth(url, video, small) {
+function fitWidth(url, video, small, secondary) {
   // Sayfa CSS'i henüz uygulanmadıysa video varsayılan 300×150 ölçülür → en küçük dosya
   // seçilirdi. Ölçüm makul değilse kutunun CSS'teki gerçek boyutu tahmin edilir.
   const r = video.getBoundingClientRect();
@@ -344,7 +337,7 @@ function fitWidth(url, video, small) {
   const boxH = laidOut ? r.height : small ? Math.min(Math.max(250, window.innerHeight * 0.38), 360) : window.innerHeight;
   const shownW = Math.max(boxW, boxH * VIDEO_ASPECT);
   const need = shownW * Math.min(window.devicePixelRatio || 1, VIDEO.maxDpr);
-  const steps = WIDTH_STEPS.filter((x) => x <= VIDEO.maxWidth);
+  const steps = WIDTH_STEPS.filter((x) => x <= (secondary ? VIDEO.secondaryMax : VIDEO.maxWidth));
   const w = steps.find((x) => x >= need) || steps[steps.length - 1];
   return withQuality(url).replace(/w_\d+/, 'w_' + w);
 }
@@ -421,7 +414,7 @@ function initBgVideo(video, hero, { lazy = false } = {}) {
     if (tier === 'off') return; // sadece poster
     let src = (small && video.getAttribute('data-src-mobile')) || video.getAttribute('data-src');
     if (!src) return;
-    if (video.hasAttribute('data-adaptive')) src = fitWidth(src, video, small);
+    if (video.hasAttribute('data-adaptive')) src = fitWidth(src, video, small, lazy);
     const highSrc = src;
     if (tier === 'low') src = lowRendition(src);
     currentSrc = src;
@@ -454,18 +447,14 @@ function initBgVideo(video, hero, { lazy = false } = {}) {
     window.addEventListener('havakare:video-ready', (e) => {
       if (e.detail && String(e.detail).includes('hero-bg-video') && pickVideoTier(false) === 'high') setTimeout(() => go(false), 1000);
     });
-  } else if (pickVideoTier(false) === 'low') {
-    // YAVAŞ HAT: önce 3D dron (~0,5 MB) insin, sonra video. Eskiden video tüm bant genişliğini
-    // alıyor, dron ya çok geç geliyor ya hiç gelmiyordu. Poster bu arada zaten görünür.
-    let kicked = false;
-    const go = () => { if (kicked) return; kicked = true; startVideo(true); };
-    window.addEventListener('havakare:hero-ready', () => setTimeout(go, 600), { once: true });
-    setTimeout(go, 9000);
   } else {
-    // İLK AÇILIŞ AKICILIĞI: hızlı hatta video HEMEN başlar; ağır iş olan 3D drone, video
-    // gerçekten oynamaya başladıktan sonra yüklenir (bkz. scheduleDroneBoot). Böylece video
-    // çözme, drone ayrıştırma/shader derleme ve giriş animasyonu aynı anda CPU/GPU'yu boğmaz.
-    startVideo(false);
+    // HER HATTA önce hero 3D dronu (~0,5 MB) iner, video ondan sonra başlar (poster bu arada
+    // görünür). Dron indirilirken GERÇEK hız ölçülür (device.js) → video boyutu tahmine göre
+    // değil ölçüme göre seçilir. Hızlı hatta dron ~1 sn'de geldiği için gecikme fark edilmez.
+    let kicked = false;
+    const go = () => { if (kicked) return; kicked = true; startVideo(false); };
+    window.addEventListener('havakare:hero-ready', () => setTimeout(go, 250), { once: true });
+    setTimeout(go, pickVideoTier(false) === 'low' ? 10000 : 4000); // güvenlik ağı
   }
 
   const kick = () => { if (video.paused && started) play(); };

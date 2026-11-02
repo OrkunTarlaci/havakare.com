@@ -2358,12 +2358,20 @@ export async function initDroneStages() {
       .catch((err) => console.error(label + ' drone stage failed:', err));
   }
 
-  // Hero hazır olunca, tarayıcı boştayken Mavic 3 modelini önceden indir + ayrıştır.
-  // Hızlı hatta 2 sn, yavaş hatta (bant genişliği önce hero videosuna kalsın) 8 sn sonra.
+  // Hero hazır olunca Mavic 3 modelini (1,7 MB) önceden indir + ayrıştır — ama hero videosu
+  // akıcı oynayacak kadar tamponlandıktan SONRA (video ile bant genişliği için yarışmasın).
+  // Video hiç gelmezse (veri tasarrufu, otomatik oynatma engeli) güvenlik süresiyle yine iner.
+  // Kullanıcı o sırada bölüme yaklaşırsa whenNear zaten hemen yükler (aynı indirme paylaşılır).
   function prefetchLater() {
     if (!cinematicContainer && !captureContainer) return;
+    const slow = isSlowConnection();
+    let done = false;
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1));
-    setTimeout(() => idle(() => preloadModel(MODEL_URL_MAVIC3), { timeout: 3000 }), isSlowConnection() ? 8000 : 2000);
+    const go = () => { if (done) return; done = true; idle(() => preloadModel(MODEL_URL_MAVIC3), { timeout: 3000 }); };
+    window.addEventListener('havakare:video-ready', (e) => {
+      if (e.detail && String(e.detail).includes('hero-bg-video')) setTimeout(go, slow ? 3000 : 1000);
+    });
+    setTimeout(go, slow ? 25000 : 12000);
   }
 
   if (heroContainer) {
