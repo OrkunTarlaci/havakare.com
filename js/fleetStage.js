@@ -22,7 +22,7 @@ import {
   MANUAL_ORIENTATION_OFFSET_Y,
   MANUAL_ORIENTATION_OFFSET_Y_MAVIC3,
 } from './droneModel.js';
-import { buildFpvDrone, buildAvataDrone } from './droneBuilds.js';
+import { buildFpvDrone, buildAvataDrone, createStudioEnv } from './droneBuilds.js';
 import { GL } from './device.js';
 
 const CAMERA_FOV_DEG = 22;
@@ -32,8 +32,8 @@ const AUTO_YAW = 0.32; // rad/sn — kendi kendine yavaş dönüş
 const DRAG_YAW = 0.012; // sürüklenen piksel başına rad
 
 const LOADERS = {
-  fpv: () => Promise.resolve(buildFpvDrone()),
-  avata: () => Promise.resolve(buildAvataDrone()),
+  fpv: async (env) => buildFpvDrone(env), // async: bir kartın hatası diğerlerini durdurmaz
+  avata: async (env) => buildAvataDrone(env),
   mavic: () => loadDroneRig(MODEL_URL_MAVIC3, MANUAL_ORIENTATION_OFFSET_Y_MAVIC3),
   mini: () => loadDroneRig(MODEL_URL_MINI3, MANUAL_ORIENTATION_OFFSET_Y),
 };
@@ -101,6 +101,7 @@ export async function initFleetStage() {
   renderer.toneMappingExposure = 1.05;
   renderer.setClearColor(0x000000, 0);
 
+  const env = createStudioEnv(renderer); // yalnızca kodla kurulan dronların malzemeleri kullanır
   const scene = new THREE.Scene();
   createStudioLights(scene);
   const pad = createPad();
@@ -163,10 +164,12 @@ export async function initFleetStage() {
   fit();
 
   views.forEach((view) => {
-    LOADERS[view.media.dataset.fleetModel]()
-      .then((rig) => {
+    LOADERS[view.media.dataset.fleetModel](env)
+      .then(async (rig) => {
         view.tilt.add(rig.orientationGroup);
         view.animateProps = rig.animateProps;
+        // Shader'lar ilk çizimden önce arka planda derlensin: kart ekrana girerken takılma olmaz.
+        try { await renderer.compileAsync(scene, camera); } catch (_) { /* ilk çizimde derlenir */ }
         view.ready = true;
       })
       .catch((err) => console.warn('Fleet drone failed:', err)); // kartta fotoğraf kalır
@@ -253,6 +256,7 @@ export async function initFleetStage() {
     io.disconnect();
     resizeObserver.disconnect();
     renderer.dispose();
+    env.dispose();
     views.forEach((v) => v.canvas.remove());
   }
 
