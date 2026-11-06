@@ -33,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileMenu();
   initHeroVideo();
   initManifestoVideo();
+  initCinematicVideo();
+  initViewfinder();
   initDronePlaceholder();
   initServiceWorker();
   initRevealAnimations();
@@ -288,6 +290,35 @@ function initManifestoVideo() {
   initBgVideo(document.querySelector('.manifesto-bg-video'), document.getElementById('manifesto'), { lazy: true });
 }
 
+// Sinematik bölüm — hero'nun dosyası, ortasından başlar. Önceden indirilmez: bölüme yaklaşınca başlar.
+function initCinematicVideo() {
+  initBgVideo(document.querySelector('.cinematic-bg-video'), document.getElementById('cinematic'), { lazy: true, prefetch: false });
+}
+
+// Vizör: bölüme girince odak çerçevesi drona kilitlenir (is-framed, bir kez) ve zaman kodu
+// yalnızca bölüm ekrandayken akar.
+function initViewfinder() {
+  const section = document.getElementById('cinematic');
+  const clock = document.querySelector('[data-vf-clock]');
+  if (!section || !clock || !('IntersectionObserver' in window)) return;
+  const pad = (n) => String(n).padStart(2, '0');
+  let seconds = 0;
+  let timer = null;
+  new IntersectionObserver((entries) => {
+    const inView = entries[entries.length - 1].isIntersecting;
+    if (inView) section.classList.add('is-framed');
+    if (inView && !timer) {
+      timer = setInterval(() => {
+        seconds++;
+        clock.textContent = `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+      }, 1000);
+    } else if (!inView && timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }, { threshold: 0.35 }).observe(section);
+}
+
 // ---------------------------------------------------------------------
 // Ağ hızına göre video seçimi (bkz. device.js netTier).
 //   'off'  → veri tasarrufu / 2G: video hiç inmez, sadece poster görünür
@@ -346,7 +377,7 @@ function fitWidth(url, video, small, secondary) {
 // yedek adres, takılırsa otomatik küçük sürüm, ekrandan çıkınca durur.
 // Öncelik sırası: sayfa → drone modeli → hero videosu → (hızlıysa) araba videosu.
 // lazy:true → bölüm ekrana ~1 ekran kala yüklenmeye başlar.
-function initBgVideo(video, hero, { lazy = false } = {}) {
+function initBgVideo(video, hero, { lazy = false, prefetch = true } = {}) {
   if (!video || !hero) return;
 
   video.muted = true;
@@ -422,6 +453,13 @@ function initBgVideo(video, hero, { lazy = false } = {}) {
     video.addEventListener('error', () => {
       if (fallback && video.src !== fallback) { video.src = fallback; video.load(); play(); }
     }, { once: true });
+    // data-start: video baştan değil, süresinin bu oranından başlar (aynı dosyada farklı planlar).
+    const startAt = parseFloat(video.getAttribute('data-start'));
+    if (startAt) {
+      video.addEventListener('loadedmetadata', () => {
+        try { if (video.duration) video.currentTime = video.duration * startAt; } catch (_) {}
+      }, { once: true });
+    }
     video.preload = tier === 'low' ? 'metadata' : 'auto';
     video.src = src;
     video.load();
@@ -444,7 +482,7 @@ function initBgVideo(video, hero, { lazy = false } = {}) {
       if (entries.some((e) => e.isIntersecting)) { loadPoster(); go(false); }
     }, { rootMargin: '300px 0px 300px 0px' });
     near.observe(hero);
-    window.addEventListener('havakare:video-ready', (e) => {
+    if (prefetch) window.addEventListener('havakare:video-ready', (e) => {
       if (e.detail && String(e.detail).includes('hero-bg-video') && pickVideoTier(false) === 'high') setTimeout(() => go(false), 1000);
     });
   } else {

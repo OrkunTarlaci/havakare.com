@@ -2428,6 +2428,19 @@ export async function initDroneStages() {
     );
   }
 
+  // Filo kartları ("Her çekime doğru drone."): tek renderer, kartlar görünürken çizilir.
+  // Çizim bu dosyadaki stages listesine girdiği için kare hızı ve kalite kararları ortaktır.
+  whenNear(document.querySelector('.fleet-grid'), () => {
+    import('./fleetStage.js')
+      .then(({ initFleetStage }) => initFleetStage())
+      .then((st) => {
+        if (!st) return;
+        stages.push(st);
+        if (currentQuality !== 1) st.setQualityScale(currentQuality);
+      })
+      .catch((err) => console.error('Fleet stage failed:', err)); // kartlarda fotoğraflar kalır
+  });
+
   function render() {
     for (let i = 0; i < stages.length; i++) stages[i].render();
   }

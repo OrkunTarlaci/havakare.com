@@ -10,13 +10,15 @@
   "imports": {
     "three": "./vendor/three/three.module.min.js",
     "three/addons/": "./vendor/three/addons/",
-    "./js/droneStage.js": "./js/droneStage.js?v=20261102-1734",
-    "./js/droneModel.js": "./js/droneModel.js?v=20261102-1734",
-    "./js/droneProps.js": "./js/droneProps.js?v=20261102-1734",
-    "./js/scene.js": "./js/scene.js?v=20261102-1734",
-    "./js/utils.js": "./js/utils.js?v=20261102-1734",
-    "./js/whatsappPicker.js": "./js/whatsappPicker.js?v=20261102-1734",
-    "./js/device.js": "./js/device.js?v=20261102-1734"
+    "./js/droneStage.js": "./js/droneStage.js?v=20261106-2202",
+    "./js/droneModel.js": "./js/droneModel.js?v=20261106-2202",
+    "./js/droneProps.js": "./js/droneProps.js?v=20261106-2202",
+    "./js/scene.js": "./js/scene.js?v=20261106-2202",
+    "./js/utils.js": "./js/utils.js?v=20261106-2202",
+    "./js/whatsappPicker.js": "./js/whatsappPicker.js?v=20261106-2202",
+    "./js/fleetStage.js": "./js/fleetStage.js?v=20261106-2202",
+    "./js/droneBuilds.js": "./js/droneBuilds.js?v=20261106-2202",
+    "./js/device.js": "./js/device.js?v=20261106-2202"
   }
 }
 </script>
@@ -50,7 +52,7 @@
 <!-- Fontlar sayfayı bloklamadan yüklenir -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'" />
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
-<link rel="stylesheet" href="./css/styles.css?v=20261102-1734" />
+<link rel="stylesheet" href="./css/styles.css?v=20261106-2202" />
 
 <!-- ÖNCELİK: önce hero video posteri, sonra video. 3D drone (three.js + GLB ≈ 1.3 MB) artık burada
      ÖNCEDEN indirilmez; main.js video akmaya başlayınca (yavaş hatta tamponlanınca) yükler. -->
@@ -63,7 +65,7 @@
 (function () {
   // Sürüm, bump-version.sh tarafından diğer ?v= değerleriyle birlikte güncellenir (aynı olmalı:
   // farklı olursa önden indirilen dosyalar kullanılmaz ve ikinci kez indirilir).
-  var V = '20261102-1734', h = document.head;
+  var V = '20261106-2202', h = document.head;
   function add(rel, href, extra) {
     var l = document.createElement('link'); l.rel = rel; l.href = href;
     for (var k in (extra || {})) l.setAttribute(k, extra[k]);
@@ -79,7 +81,7 @@
 </script>
 <!-- Three.js as native ES modules via import map (no build step needed) -->
 <!-- GSAP (UMD, global gsap) — drives the slow yaw spin + hero text intro -->
-<script src="./vendor/gsap.min.js?v=20261102-1734" defer></script>
+<script src="./vendor/gsap.min.js?v=20261106-2202" defer></script>
 <!-- Güvenlik ağı: herhangi bir script/CDN sorunu olsa bile açılış ekranı en geç 5 sn sonra kalkar,
      site asla "GÖRÜNTÜ HAZIRLANIYOR" ekranında takılı kalmaz. -->
 <script>
@@ -264,7 +266,7 @@
       <div class="fleet-grid">
 
         <div class="fleet-card reveal">
-          <div class="fleet-media"><img width="720" height="720" src="./images/fpv-aksiyon-drone.webp" alt="Dinamik takip ve aksiyon çekimleri için kullandığımız FPV drone sistemi" loading="lazy" decoding="async" /></div>
+          <div class="fleet-media" data-fleet-model="fpv"><img width="720" height="720" src="./images/fpv-aksiyon-drone.webp" alt="Dinamik takip ve aksiyon çekimleri için kullandığımız FPV drone sistemi" loading="lazy" decoding="async" /></div>
           <span class="fleet-label">Hız &amp; Aksiyon</span>
           <h3>FPV Aksiyon Dronu</h3>
           <p class="fleet-desc">Hızlı geçişler, dinamik araç takipleri ve yüksek hareket gerektiren sahneler için kullandığımız çevik çekim sistemimiz.</p>
@@ -273,7 +275,7 @@
         </div>
 
         <div class="fleet-card reveal">
-          <div class="fleet-media"><img width="360" height="360" src="./images/avata-360.webp" alt="Yakın geçiş ve akıcı hareket için kullandığımız kompakt drone sistemi" loading="lazy" decoding="async" /></div>
+          <div class="fleet-media" data-fleet-model="avata"><img width="360" height="360" src="./images/avata-360.webp" alt="Yakın geçiş ve akıcı hareket için kullandığımız kompakt drone sistemi" loading="lazy" decoding="async" /></div>
           <span class="fleet-label">Yakın Geçiş &amp; Akıcı Hareket</span>
           <h3>Avata 360</h3>
           <p class="fleet-desc">Mekân içerisinde veya objelere yakın kontrollü geçişler gerektiren çekimlerde akıcı hareket dili oluşturmak için tercih ettiğimiz sistem.</p>
@@ -282,7 +284,7 @@
         </div>
 
         <div class="fleet-card reveal">
-          <div class="fleet-media"><img width="720" height="720" src="./images/mavic-2s.webp" alt="Geniş perspektif ve sinematik kamera hareketleri için kullandığımız çekim platformu" loading="lazy" decoding="async" /></div>
+          <div class="fleet-media" data-fleet-model="mavic"><img width="720" height="720" src="./images/mavic-2s.webp" alt="Geniş perspektif ve sinematik kamera hareketleri için kullandığımız çekim platformu" loading="lazy" decoding="async" /></div>
           <span class="fleet-label">Sinematik Perspektif</span>
           <h3>Mavic 2S</h3>
           <p class="fleet-desc">Geniş perspektif, kontrollü kamera hareketleri ve güçlü genel planlar gerektiren prodüksiyonlarda kullandığımız sinematik çekim platformu.</p>
@@ -291,7 +293,7 @@
         </div>
 
         <div class="fleet-card reveal">
-          <div class="fleet-media"><img width="720" height="720" src="./images/mini-5-pro.webp" alt="Kompakt ve esnek çekim planlaması için kullandığımız hafif drone" loading="lazy" decoding="async" /></div>
+          <div class="fleet-media" data-fleet-model="mini"><img width="720" height="720" src="./images/mini-5-pro.webp" alt="Kompakt ve esnek çekim planlaması için kullandığımız hafif drone" loading="lazy" decoding="async" /></div>
           <span class="fleet-label">Kompakt &amp; Esnek</span>
           <h3>Mini 5 Pro</h3>
           <p class="fleet-desc">Daha kompakt ekipman ve esnek çekim yaklaşımı gerektiren projelerde hızlı planlama ve kontrollü kadrajlar için kullandığımız çözüm.</p>
@@ -338,6 +340,22 @@
 
   <!-- ================= DARK CINEMATIC SECTION ================= -->
   <section id="cinematic">
+    <!-- Arka plan: kararmış hava çekimi + kamera vizörü. Video hero ile aynı dosyadır (ek kaynak yok),
+         farklı planlar görünsün diye ortasından başlar. Bölüme yaklaşınca yüklenir, çıkınca durur. -->
+    <div class="cinematic-bg" aria-hidden="true">
+      <video class="cinematic-bg-video" data-adaptive="1" data-start="0.5" muted loop playsinline webkit-playsinline preload="none" data-poster="https://res.cloudinary.com/tyrtartu/video/upload/so_1,f_auto,q_auto:good,w_1600,c_limit/v1793225596/1029_2.jpg" disablepictureinpicture tabindex="-1"
+             data-src="https://res.cloudinary.com/tyrtartu/video/upload/f_mp4,vc_h264,ac_none,fps_30,q_auto:good,w_1600,c_limit/v1793225596/1029_2.mp4"
+             data-src-mobile="https://res.cloudinary.com/tyrtartu/video/upload/f_mp4,vc_h264,ac_none,fps_30,q_auto:good,w_1080,c_limit/v1793225596/1029_2.mp4"
+             data-src-fallback="https://res.cloudinary.com/tyrtartu/video/upload/v1793225596/1029_2.mp4"></video>
+      <div class="cinematic-bg-overlay"></div>
+      <div class="viewfinder">
+        <span class="vf-thirds"></span>
+        <span class="vf-frame"></span>
+        <span class="vf-rec"><i></i>REC <span data-vf-clock>00:00:00</span></span>
+        <span class="vf-format">4K 30P</span>
+        <span class="vf-exposure">1/60 &nbsp; f/2.8 &nbsp; ISO 100</span>
+      </div>
+    </div>
     <div class="cinematic-inner section-title-dark">
       <div class="cinematic-text">
         <span class="eyebrow reveal">KADRAJ BİZİM İÇİN HER ŞEY</span>
@@ -598,8 +616,8 @@
   <span class="whatsapp-tooltip">WhatsApp'tan Yazın</span>
 </a>
 
-<script type="module" src="./js/smoothScroll.js?v=20261102-1734"></script>
-<script type="module" src="./js/main.js?v=20261102-1734"></script>
-<script type="module" src="./js/faq.js?v=20261102-1734"></script>
+<script type="module" src="./js/smoothScroll.js?v=20261106-2202"></script>
+<script type="module" src="./js/main.js?v=20261106-2202"></script>
+<script type="module" src="./js/faq.js?v=20261106-2202"></script>
 </body>
 </html>
